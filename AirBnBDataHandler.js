@@ -1,177 +1,236 @@
 /**
+ * @file AirBnBDataHandler.js
+ * @description Main data module for processing Airbnb listings, now using csv-parse for robust CSV handling.
  * @module AirBnBDataHandler
- * This module provides a factory function that returns methods
- * to load and process AirBnB listings data.
  */
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from "node:fs/promises";
+import { parse } from "csv-parse/sync";
 
 /**
+ * A single Airbnb Listing object (subset of columns).
  * @typedef {Object} Listing
- * @property {number} price - Price of the listing.
- * @property {number} number_of_rooms - Number of rooms.
- * @property {number} review_score - Review score.
- * @property {string} host_id - Host identifier or host name.
- * // Add or adjust fields as per your CSV columns
+ * @property {string} id
+ * @property {string} name
+ * @property {string} host_id
+ * @property {string} host_name
+ * @property {number} host_listings_count
+ * @property {number} bedrooms
+ * @property {number} price
+ * @property {number} review_scores_rating
  */
 
 /**
- * Parses a CSV string into an array of objects.
- * @param {string} csvData - The CSV file content as a string.
- * @returns {Listing[]} Array of listing objects.
+ * Reads a CSV file, handles quoted fields properly, and returns an array of listing objects.
+ * @async
+ * @param {string} csvFilePath - Path to the unzipped Airbnb CSV file
+ * @returns {Promise<Listing[]>} - Promise that resolves to an array of Listing objects
  */
-function parseCSV(csvData) {
-  // Adjust the parsing logic to match your specific CSV columns
-  const [headerLine, ...lines] = csvData.split('\n').map((l) => l.trim());
-  const headers = headerLine.split(',');
+async function loadCSV(csvFilePath) {
+  // Read entire file contents
+  const raw = await readFile(csvFilePath, "utf-8");
 
-  return lines
-    .filter((line) => line) // Remove empty lines
-    .map((line) => {
-      const columns = line.split(',');
-      // Build object using the headers for keys
-      const listing = {};
-      headers.forEach((header, index) => {
-        // Example: header might be "price", "number_of_rooms", "review_score", "host_id", ...
-        // Convert to number if it’s a numeric field, otherwise keep as string
-        if (['price', 'number_of_rooms', 'review_score'].includes(header)) {
-          listing[header] = Number(columns[index]) || 0;
-        } else {
-          listing[header] = columns[index] || '';
+  /**
+   * Parse the CSV into an array of objects. By using "columns: true",
+   * each row becomes an object with keys based on the header row.
+   * csv-parse/sync will automatically handle quoted strings, embedded commas, etc.
+   */
+  const records = parse(raw, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  });
+
+  // Now "records" is an array of objects like:
+  // [
+  //   { id: "1234", name: "Cool listing, near beach", price: "$100.00", ... },
+  //   { id: "2345", name: "Another listing", price: "$120.00", ... },
+  // ]
+
+  // Convert each record's fields to the correct data types
+  const listings = records.map((row) => ({
+    id: row.id || "",
+    name: row.name || "",
+    host_id: row.host_id || "",
+    host_name: row.host_name || "",
+    host_listings_count: parseInt(row.host_listings_count || "0", 10),
+    bedrooms: parseFloat(row.bedrooms || "0"),
+    price: parseFloat(
+      (row.price || "0")
+        .replace("$", "")
+        .replace(",", "")
+    ),
+    review_scores_rating: parseFloat(row.review_scores_rating || "0"),
+  }));
+
+  return listings;
+}
+
+/**
+ * Creates an AirBnBDataHandler object with chainable methods.
+ * @param {Listing[]} listingData - The array of Listing objects
+ * @returns {object} Chainable handler with filter and compute methods
+ */
+function createDataHandler(listingData) {
+  let currentData = [...listingData]; // copy to avoid mutating original
+
+  return {
+    /**
+     * Filters listings by a price range.
+     * @param {number} minPrice - Minimum price
+     * @param {number} maxPrice - Maximum price
+     * @returns {this} returns the same handler object for chaining
+     */
+    filterByPrice(minPrice, maxPrice) {
+      currentData = currentData.filter(
+        (item) => item.price >= minPrice && item.price <= maxPrice
+      );
+      return this;
+    },
+
+    /**
+     * Filters listings by a bedroom range.
+     * @param {number} minRooms - Minimum number of bedrooms
+     * @param {number} maxRooms - Maximum number of bedrooms
+     * @returns {this} returns the same handler object for chaining
+     */
+    filterByBedrooms(minRooms, maxRooms) {
+      currentData = currentData.filter(
+        (item) => item.bedrooms >= minRooms && item.bedrooms <= maxRooms
+      );
+      return this;
+    },
+
+    /**
+     * Filters listings by a review score range.
+     * @param {number} minScore - Minimum review score
+     * @param {number} maxScore - Maximum review score
+     * @returns {this} returns the same handler object for chaining
+     */
+    filterByReviewScore(minScore, maxScore) {
+      currentData = currentData.filter(
+        (item) =>
+          item.review_scores_rating >= minScore &&
+          item.review_scores_rating <= maxScore
+      );
+      return this;
+    },
+
+    /**
+     * Computes basic statistics about the current dataset.
+     * @returns {Object} statistics object
+     */
+    computeStats() {
+      const totalListings = currentData.length;
+      if (totalListings === 0) {
+        return {
+          totalListings,
+          avgPrice: 0,
+          avgPriceByBedrooms: {},
+        };
+      }
+
+      // Average price overall
+      const totalPrice = currentData.reduce((sum, item) => sum + item.price, 0);
+      const avgPrice = totalPrice / totalListings;
+
+      // Average price per bedroom
+      const perBedroomData = currentData.reduce((acc, item) => {
+        const key = item.bedrooms || 0;
+        if (!acc[key]) {
+          acc[key] = { totalPrice: 0, count: 0 };
+        }
+        acc[key].totalPrice += item.price;
+        acc[key].count += 1;
+        return acc;
+      }, {});
+      const avgPriceByBedrooms = {};
+      for (const [rooms, obj] of Object.entries(perBedroomData)) {
+        avgPriceByBedrooms[rooms] = obj.totalPrice / obj.count;
+      }
+
+      return {
+        totalListings,
+        avgPrice,
+        avgPriceByBedrooms,
+      };
+    },
+
+    /**
+     * Computes how many listings each host has in the current dataset
+     * and returns a ranking sorted by number of listings (descending).
+     * @returns {Array} - Array of {host_id, host_name, listingsCount}
+     */
+    computeHostRanking() {
+      const rankingMap = currentData.reduce((acc, item) => {
+        if (!item.host_id) return acc;
+        const hostKey = item.host_id;
+        if (!acc[hostKey]) {
+          acc[hostKey] = {
+            host_id: item.host_id,
+            host_name: item.host_name,
+            listingsCount: 0,
+          };
+        }
+        acc[hostKey].listingsCount += 1;
+        return acc;
+      }, {});
+
+      const rankingArray = Object.values(rankingMap);
+      rankingArray.sort((a, b) => b.listingsCount - a.listingsCount);
+      return rankingArray;
+    },
+
+    /**
+     * (Optional) Creative addition: find listing with best rating-to-price ratio
+     * ratio = review_scores_rating / price.
+     * @returns {Listing | null} best value listing or null if none found
+     */
+    computeBestValue() {
+      let best = null;
+      let bestRatio = 0;
+      currentData.forEach((item) => {
+        if (item.price > 0) {
+          const ratio = item.review_scores_rating / item.price;
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            best = item;
+          }
         }
       });
-      return listing;
-    });
-}
+      return best;
+    },
 
-/**
- * A factory function that creates an AirBnBDataHandler object with chainable methods.
- * @param {Listing[]} [initialListings=[]] - Optional initial listings array.
- * @returns {Object} An object containing data handling methods.
- */
-function createAirBnBDataHandler(initialListings = []) {
-  // The data we will process (make sure it is only mutated in pure ways, or replaced).
-  let _listings = [...initialListings];
+    /**
+     * Exports the current dataset or any data to a JSON file.
+     * @async
+     * @param {string} filename - Output filename
+     * @param {any} dataToExport - Optional data to export; defaults to current filtered dataset
+     * @returns {Promise<void>}
+     */
+    async exportResults(filename, dataToExport = null) {
+      const payload = dataToExport || currentData;
+      await writeFile(filename, JSON.stringify(payload, null, 2), "utf-8");
+    },
 
-  /**
-   * Filters the listings based on price, number_of_rooms, and/or review_score.
-   * @param {Object} filterCriteria
-   * @param {number} [filterCriteria.minPrice] - Minimum price.
-   * @param {number} [filterCriteria.maxPrice] - Maximum price.
-   * @param {number} [filterCriteria.minRooms] - Minimum number of rooms.
-   * @param {number} [filterCriteria.maxRooms] - Maximum number of rooms.
-   * @param {number} [filterCriteria.minReview] - Minimum review score.
-   * @param {number} [filterCriteria.maxReview] - Maximum review score.
-   * @returns {Object} The handler itself (for chaining).
-   */
-  function filterListings({
-    minPrice,
-    maxPrice,
-    minRooms,
-    maxRooms,
-    minReview,
-    maxReview,
-  } = {}) {
-    _listings = _listings.filter((listing) => {
-      // We only filter if the user provided a constraint
-      if (minPrice !== undefined && listing.price < minPrice) return false;
-      if (maxPrice !== undefined && listing.price > maxPrice) return false;
-      if (minRooms !== undefined && listing.number_of_rooms < minRooms)
-        return false;
-      if (maxRooms !== undefined && listing.number_of_rooms > maxRooms)
-        return false;
-      if (minReview !== undefined && listing.review_score < minReview)
-        return false;
-      if (maxReview !== undefined && listing.review_score > maxReview)
-        return false;
-      return true;
-    });
-    return handler; // Return the handler object to enable chaining
-  }
-
-  /**
-   * Computes statistics based on current filtered listings:
-   * 1. How many listings match the filter.
-   * 2. Average price per number of rooms.
-   * @returns {{ count: number, averagePricePerRoom: number }} Stats object.
-   */
-  function computeStats() {
-    const count = _listings.length;
-    let averagePricePerRoom = 0;
-    if (count > 0) {
-      // For example: total price / total rooms
-      const totalPrice = _listings.reduce((sum, l) => sum + l.price, 0);
-      const totalRooms = _listings.reduce((sum, l) => sum + l.number_of_rooms, 0);
-      averagePricePerRoom = totalRooms === 0 ? 0 : totalPrice / totalRooms;
-    }
-
-    return {
-      count,
-      averagePricePerRoom,
-    };
-  }
-
-  /**
-   * Computes how many listings are there per host, and returns a ranking (descending).
-   * @returns {Array<{ host_id: string, count: number }>} Array of objects sorted by count desc.
-   */
-  function computeListingsByHost() {
-    const hostMap = _listings.reduce((acc, listing) => {
-      const hostKey = listing.host_id || 'unknown';
-      acc[hostKey] = (acc[hostKey] || 0) + 1;
-      return acc;
-    }, {});
-
-    const ranking = Object.entries(hostMap)
-      .map(([host_id, count]) => ({ host_id, count }))
-      .sort((a, b) => b.count - a.count);
-
-    return ranking;
-  }
-
-  /**
-   * Exports the current listings array (or a stats object) to a user-specified file.
-   * @param {string} outputPath - Where to save the JSON file of results.
-   * @param {Object} data - The data you want to export; can be stats or filtered listings.
-   * @returns {Promise<void>} A promise that resolves when file is written.
-   */
-  async function exportResults(outputPath, data) {
-    const jsonString = JSON.stringify(data, null, 2);
-    await writeFile(outputPath, jsonString, 'utf-8');
-  }
-
-  /**
-   * A counter-example to show what breaks the concept of pure functions.
-   * This function *intentionally* modifies external state (a global variable, etc.).
-   * @param {any} globalState - Some external state.
-   */
-  function impureFunctionCounterExample(globalState) {
-    // This is an example of an impure function that modifies something outside its scope
-    globalState.modified = true;
-    // It depends on and changes external data instead of returning a new object
-    // demonstrating how NOT to do it in functional programming.
-    // (This is only to fulfill the assignment requirement.)
-  }
-
-  // We store all methods in a single object for convenience
-  const handler = {
-    filterListings,
-    computeStats,
-    computeListingsByHost,
-    exportResults,
-    impureFunctionCounterExample,
+    /**
+     * Resets current data back to the original loaded listing data.
+     * @returns {this} handler object for chaining
+     */
+    reset() {
+      currentData = [...listingData];
+      return this;
+    },
   };
-
-  return handler;
 }
 
 /**
- * Loads the CSV file, parses its content, and returns a new AirBnBDataHandler.
- * @param {string} filePath - Path to the CSV file.
- * @returns {Promise<Object>} A promise that resolves to the created handler with data loaded.
+ * Main function that loads the CSV and returns the chainable data handler.
+ * @async
+ * @param {string} csvFilePath - Path to the CSV file
+ * @returns {Promise<ReturnType<typeof createDataHandler>>}
  */
-export async function loadAirBnBData(filePath) {
-  const csvData = await readFile(filePath, 'utf-8');
-  const parsedListings = parseCSV(csvData);
-  return createAirBnBDataHandler(parsedListings);
+export async function AirBnBDataHandler(csvFilePath) {
+  const listingData = await loadCSV(csvFilePath);
+  return createDataHandler(listingData);
 }

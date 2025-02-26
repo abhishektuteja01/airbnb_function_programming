@@ -1,16 +1,19 @@
 {
   "name": "homework3",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "cli.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "docs": "jsdoc -c jsdoc.json"
+    "start": "node cli.js Listings.csv",
+    "docs": "jsdoc -c jsdoc.json",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "A functional programming exercise for Airbnb CSV data",
   "devDependencies": {
     "eslint": "^9.21.0",
     "eslint-config-prettier": "^10.0.1",
@@ -18,6 +21,7 @@
     "prettier": "^3.5.2"
   },
   "dependencies": {
+    "csv-parse": "^5.6.0",
     "promises": "^0.2.5"
   }
 }
