@@ -1,0 +1,23 @@
+{
+  "name": "homework3",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs": "jsdoc -c jsdoc.json"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "eslint": "^9.21.0",
+    "eslint-config-prettier": "^10.0.1",
+    "jsdoc": "^4.0.4",
+    "prettier": "^3.5.2"
+  },
+  "dependencies": {
+    "promises": "^0.2.5"
+  }
+}
