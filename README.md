@@ -166,7 +166,7 @@ Once you start the CLI, you will see a prompt like:
 - **quit**:
   Exits the CLI.
 
-## Generating Documentation
+## Generating Documentation : [Preview link](https://htmlpreview.github.io/?https://github.com/abhishektuteja01/airbnb_function_programming/blob/main/docs/index.html)
 
 We use JSDoc to generate HTML docs.
 1. Update jsdoc.json if needed.
