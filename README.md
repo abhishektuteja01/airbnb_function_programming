@@ -84,13 +84,12 @@ handler
   - price
   - review_scores_rating
 
-(Adjust if your CSV headers differ.)
 
 ## Installation & Setup
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/YourUsername/airbnb-functional-project.git
+git clone https://github.com/abhishektuteja01/airbnb_function_programming.git
 cd airbnb-functional-project
 ```
 
@@ -127,7 +126,11 @@ to format with Prettier.
 The main entry point for the CLI is cli.js. It expects you to provide a CSV file path as a parameter.
 
 ```bash
-node cli.js data/Listings.csv
+node cli.js data/listings.csv
+```
+or 
+```bash
+node cli.js data/listings.csv.gz
 ```
 
 For example:
@@ -207,7 +210,28 @@ If the price is zero or missing, we skip that listing to avoid division by zero.
 
 ## Impure Code Counterexample
 
-We include a file named counterExample.js that demonstrates an impure function. Specifically, it mutates a global variable and thus violates the principle of "no side effects." This is purely an example of what not to do in functional programming.
+COUNTER EXAMPLE (IMPURE):
+
+ Here's how someone might break functional principles by mutating data in place
+ rather than returning a new array or reassigning "currentData".
+ This would happen if we wrote something like this inside our
+ chainable handler:
+
+ ```javascript
+ function impureFilterInPlace(minPrice, maxPrice) {
+   for (const item of listingData) {
+     // artificially adjust item.price, i.e. side-effect
+     item.price = item.price + 100; 
+   }
+   // now listingData is forever changed, losing original info
+   // next we do a filter
+   listingData = listingData.filter(item => item.price >= minPrice && item.price <= maxPrice);
+ }
+ ```
+
+ This code has side effects on listingData that affect all future operations.
+ It's shown here only as a "DON'T DO THIS" example.
+
 
 ## Hardest and Most Rewarding Parts
 
@@ -227,13 +251,13 @@ This allowed a clean, functional approach.
 
 - For this project, we used AI assistance for:
   1. Debugging CSV parsing issues - Used ChatGPT 4o. Prompt: 'I am using line.split(",") in my code. Here is the code. I want to use a better way to handle quoted fields and embedded commas.' Initially, we tried line.split(",") but encountered issues with fields that contained commas inside quotes. We switched to csv-parse, which properly handles quoted fields, embedded commas, and more.
-  ```javascript
-  const records = parse(raw, {
-  columns: true,
-  skip_empty_lines: true,
-  trim: true,
-  });
-  ```
+    ```javascript
+    const records = parse(raw, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    });
+    ```
 
   2. Readme and JSDoc - Used ChatGPT 4O. Prompt: " I am creating a functional programming project with listings.csv and below code *code provided to chatgpt*, please add JSDoc comments and provide a readme file for it. I cross checked the files and they worked fine.
 
