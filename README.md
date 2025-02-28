@@ -15,6 +15,7 @@
 - [Impure Code Counterexample](#impure-code-counterexample)
 - [Hardest and Most Rewarding Parts](#hardest-and-most-rewarding-parts)
 - [Using GenAI and What Was Learned](#using-genai-and-what-was-learned)
+- [Video](#video)
 - [License](#license)
 
 ## Overview
@@ -265,6 +266,9 @@ What we learnt:
 
 - Careful code reading and manual debugging is still essential, as AI outputs can be incomplete or incorrect for certain edge cases.
 - Providing clear prompts helps generate better results.
+
+## Video
+[Youtube](https://youtu.be/vwraYVpK1n4)
 
 ## License
 
